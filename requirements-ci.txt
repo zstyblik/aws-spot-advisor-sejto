@@ -1,0 +1,11 @@
+-r requirements.txt
+
+# lint
+black==24.10.0
+flake8
+flake8-docstrings
+flake8-import-order
+reorder-python-imports
+# tests
+pytest
+requests-mock==1.12.1
