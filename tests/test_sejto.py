@@ -11,6 +11,7 @@ from unittest.mock import Mock  # noqa: I100
 from unittest.mock import patch
 
 import pytest
+from requests.exceptions import BaseHTTPError
 
 import aws_spot_advisor_sejto as sejto
 from lib import dataset
@@ -139,6 +140,98 @@ def test_main(mock_get_dataset, capsys, caplog):
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_get_dataset_http_exception(mock_get_dataset, capsys, caplog):
+    """Test handling of requests' exception from get_dataset()."""
+    region = "us-east-1"
+    os_name = "Linux"
+    expected_log_tuples = [
+        (
+            "aws_spot_advisor_sejto",
+            40,
+            (
+                "Failed to get AWS Spot Advisor data due to exception: "
+                "404 Client Error: Not Found for url: "
+                "https://www.example.com/abc123"
+            ),
+        ),
+    ]
+
+    http_error = BaseHTTPError(
+        "404 Client Error: Not Found for url: https://www.example.com/abc123"
+    )
+    mock_get_dataset.side_effect = http_error
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--region",
+        region,
+        "--os",
+        os_name,
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_get_dataset_oserror_exception(mock_get_dataset, capsys, caplog):
+    """Test handling of OSError exception from get_dataset()."""
+    region = "us-east-1"
+    os_name = "Linux"
+    expected_log_tuples = [
+        (
+            "aws_spot_advisor_sejto",
+            40,
+            (
+                "Failed to get AWS Spot Advisor data due to exception: "
+                "[Errno 2] No such file or directory: 'test.pytest'"
+            ),
+        )
+    ]
+
+    file_error = FileNotFoundError()
+    file_error.errno = 2
+    file_error.filename = "test.pytest"
+    file_error.strerror = "No such file or directory"
+    mock_get_dataset.side_effect = file_error
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--region",
+        region,
+        "--os",
+        os_name,
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
     assert captured.err == ""
 
     assert caplog.record_tuples == expected_log_tuples

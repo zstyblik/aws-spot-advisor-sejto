@@ -13,6 +13,8 @@ import sys
 from typing import Any
 from typing import Dict
 
+from requests.exceptions import BaseHTTPError
+
 from lib import conf
 from lib import filters
 from lib.dataset import DataSet
@@ -42,7 +44,11 @@ def calc_log_level(count: int) -> int:
 def get_dataset(
     config_fpath: str, dataset_fpath: str, dataset_url: str
 ) -> DataSet:
-    """Return AWS Spot Advisor dataset."""
+    """Return AWS Spot Advisor dataset.
+
+    :raises requests.exceptions.BaseHTTPError: when fetching data over HTTP
+    :raises OSError: when reading/writing data
+    """
     config = conf.new()
     _ = config.read(config_fpath)
 
@@ -79,7 +85,16 @@ def main():
     dataset_fpath = os.path.join(args.data_dir, DATASET_FNAME)
     logger.debug("Dataset file '%s'.", dataset_fpath)
 
-    dataset = get_dataset(config_fpath, dataset_fpath, args.dataset_url)
+    try:
+        dataset = get_dataset(config_fpath, dataset_fpath, args.dataset_url)
+    except (BaseHTTPError, OSError) as exception:
+        logger.error(
+            "Failed to get AWS Spot Advisor data due to exception: %s",
+            exception,
+            exc_info=1,
+        )
+        sys.exit(1)
+
     if not dataset.has_region(args.region):
         logger.error("Region '%s' not found in data.", args.region)
         sys.exit(1)
