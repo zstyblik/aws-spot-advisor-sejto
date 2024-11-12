@@ -109,6 +109,8 @@ class DataSet:
 
         This function might raise OSError or requests' related exceptions.
 
+        :raises requests.exceptions.BaseHTTPError: when fetching data over HTTP
+        :raises OSError: when reading/writing data
         :raises ValueError: if HTTP Status code isn't 200 or 304
         """
         caching_headers = self.make_caching_headers()
