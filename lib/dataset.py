@@ -174,9 +174,10 @@ def get_data(
         for key, value in extra_headers.items():
             headers[key] = value
 
-    module_logger.debug("HTTP GET %s", url)
-    module_logger.debug("HTTP Headers %s", headers)
+    module_logger.debug("HTTP req GET %s", url)
+    module_logger.debug("HTTP req Headers %s", headers)
     rsp = requests.get(url, timeout=timeout, headers=headers)
-    module_logger.debug("Got HTTP Status Code: %i", rsp.status_code)
+    module_logger.debug("HTTP rsp Status Code: %i", rsp.status_code)
+    module_logger.debug("HTTP rsp Headers: %s", rsp.headers)
     rsp.raise_for_status()
     return rsp
