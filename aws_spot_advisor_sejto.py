@@ -18,6 +18,7 @@ from requests.exceptions import BaseHTTPError
 from lib import conf
 from lib import filters
 from lib.dataset import DataSet
+from lib.models import EC2InstanceType
 
 CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
 DATA_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -235,18 +236,13 @@ def parse_args() -> argparse.Namespace:
 def print_out(results) -> None:
     """Print out results."""
     # NOTE(zstyblik): notice minus sign inside sorted!!!
-    for value in sorted(
-        results.values(), key=lambda x: (x["inter_max"], (-1) * x["savings"])
+    for instance_type in sorted(
+        results.values(), key=lambda x: (x.inter_max, (-1) * x.savings)
     ):
         print(
-            "instance_type={:s} vcpus={:d} mem_gb={:.1f} savings={:d}% "
-            "interrupts={:s}".format(
-                value["instance_type"],
-                value["cores"],
-                value["ram_gb"],
-                value["savings"],
-                value["inter_label"],
-            )
+            "instance_type={instance_type:s} vcpus={vcpus:d} "
+            "mem_gb={mem_gb:.1f} savings={savings:d}% "
+            "interrupts={interrupts:s}".format(**instance_type.print_dict())
         )
 
 
@@ -277,7 +273,12 @@ def select_data(
     }
     # NOTE(zstyblik): filter on pre-filter results, vCPUs, RAM, EMR
     results = {
-        key: values
+        key: EC2InstanceType(
+            instance_type=key,
+            emr=values["emr"],
+            vcpus=values["cores"],
+            mem_gb=values["ram_gb"],
+        )
         for key, values in data["instance_types"].items()
         if (
             key in available_instances
@@ -310,13 +311,12 @@ def select_data(
             )
             raise DataProcessingException(message=message)
 
-        extra_data = {
-            "savings": int(available_instances[key]["s"]),
-            "inter_label": interrupts[inter_range]["label"],
-            "inter_max": int(interrupts[inter_range]["max"]),
-        }
-        results[key].update(extra_data)
-        results[key].update({"instance_type": key})
+        # NOTE(zstyblik): savings can be(= tested it) moved into previous loop.
+        results[key].savings = int(available_instances[key]["s"])
+        # NOTE(zstyblik): re-think how to move these elsewhere(lookup function,
+        # pre-process data etc.) and get rid off this whole loop.
+        results[key].inter_label = interrupts[inter_range]["label"]
+        results[key].inter_max = int(interrupts[inter_range]["max"])
 
     return results
 
