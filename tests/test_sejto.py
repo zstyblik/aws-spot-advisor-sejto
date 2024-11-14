@@ -15,7 +15,6 @@ from requests.exceptions import BaseHTTPError
 
 import aws_spot_advisor_sejto as sejto
 from lib import dataset
-from lib.models import EC2InstanceType
 
 
 @pytest.mark.parametrize(
@@ -329,56 +328,3 @@ def test_main_has_os_check(mock_get_dataset, capsys, caplog):
     assert captured.err == ""
 
     assert caplog.record_tuples == expected_log_tuples
-
-
-def test_print_out(capsys):
-    """Test print_out()."""
-    results = {
-        "t3.nano": EC2InstanceType(
-            instance_type="t3.nano",
-            vcpus=4,
-            mem_gb=1.5,
-            savings=80,
-            inter_label="5-10%",
-            inter_max=11,
-        ),
-        "t2.nano": EC2InstanceType(
-            instance_type="t2.nano",
-            vcpus=3,
-            mem_gb=0.5,
-            emr=True,
-            savings=76,
-            inter_label="<5%",
-            inter_max=5,
-        ),
-        "t2.large": EC2InstanceType(
-            instance_type="t2.large",
-            vcpus=1,
-            mem_gb=2,
-            savings=75,
-            inter_label="<5%",
-            inter_max=5,
-        ),
-    }
-    expected_output = os.linesep.join(
-        [
-            (
-                "instance_type=t2.nano vcpus=3 mem_gb=0.5 savings=76% "
-                "interrupts=<5%"
-            ),
-            (
-                "instance_type=t2.large vcpus=1 mem_gb=2.0 savings=75% "
-                "interrupts=<5%"
-            ),
-            (
-                "instance_type=t3.nano vcpus=4 mem_gb=1.5 savings=80% "
-                "interrupts=5-10%"
-            ),
-            "",
-        ]
-    )
-
-    sejto.print_out(results)
-
-    captured = capsys.readouterr()
-    assert captured.out == expected_output

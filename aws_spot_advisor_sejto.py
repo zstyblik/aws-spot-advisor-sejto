@@ -17,6 +17,7 @@ from requests.exceptions import BaseHTTPError
 
 from lib import conf
 from lib import filters
+from lib import formatters
 from lib.dataset import DataSet
 from lib.models import EC2InstanceType
 
@@ -24,6 +25,11 @@ CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
 DATA_DIR = os.path.dirname(os.path.realpath(__file__))
 DATASET_FNAME = "spot-advisor-data.json"
 DATASET_URL = "https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json"
+FORMATTERS = {
+    "csv": formatters.fmt_csv,
+    "json": formatters.fmt_json,
+    "text": formatters.fmt_text,
+}
 
 
 class DataProcessingException(Exception):
@@ -79,7 +85,13 @@ def main():
     args = parse_args()
     logging.basicConfig(level=args.log_level, stream=sys.stderr)
     logger = logging.getLogger("aws_spot_advisor_sejto")
+    if args.output_format not in FORMATTERS:
+        logging.error(
+            "Output format '%s' is not supported.", args.output_format
+        )
+        sys.exit(1)
 
+    print_out_fn = FORMATTERS[args.output_format]
     config_fpath = os.path.join(args.data_dir, CONFIG_FNAME)
     logger.debug("Config file '%s'.", config_fpath)
 
@@ -114,7 +126,7 @@ def main():
         logger.error("%s", exception.message)
         sys.exit(1)
 
-    print_out(results)
+    print_out_fn(results, sys.stdout)
 
 
 def parse_args() -> argparse.Namespace:
@@ -221,6 +233,12 @@ def parse_args() -> argparse.Namespace:
         help="URL of AWS Spot dataset.",
     )
     parser.add_argument(
+        "--output-format",
+        choices=["csv", "json", "text"],
+        default="text",
+        help="Output format. Default is '%(default)s' format.",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="count",
@@ -231,19 +249,6 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     args.log_level = calc_log_level(args.verbose)
     return args
-
-
-def print_out(results) -> None:
-    """Print out results."""
-    # NOTE(zstyblik): notice minus sign inside sorted!!!
-    for instance_type in sorted(
-        results.values(), key=lambda x: (x.inter_max, (-1) * x.savings)
-    ):
-        print(
-            "instance_type={instance_type:s} vcpus={vcpus:d} "
-            "mem_gb={mem_gb:.1f} savings={savings:d}% "
-            "interrupts={interrupts:s}".format(**instance_type.print_dict())
-        )
 
 
 def select_data(
