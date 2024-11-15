@@ -133,7 +133,14 @@ def parse_args() -> argparse.Namespace:
     """Return parsed CLI args."""
     parser = argparse.ArgumentParser(
         allow_abbrev=False,
-        epilog="NOTE that AWS provides very rough estimate of interruptions.",
+        epilog="AWS Spot Advisor Sejto by Zdenek Styblik",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase log level verbosity. Can be passed multiple times.",
     )
     parser.add_argument(
         "--region",
@@ -149,62 +156,76 @@ def parse_args() -> argparse.Namespace:
         help="Operating System. Default is 'Linux'.",
     )
     parser.add_argument(
+        "--output-format",
+        choices=["csv", "json", "text"],
+        default="text",
+        help="Output format. Default is '%(default)s' format.",
+    )
+
+    filters_group = parser.add_argument_group(
+        "filters",
+        (
+            "options for AWS Spot Advisor data filtering. "
+            "NOTE that AWS provides very rough estimate of interruptions."
+        ),
+    )
+    filters_group.add_argument(
         "--vcpu-min",
         type=int,
         default=(-1),
         help="Minimum vCPUs.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--vcpu-max",
         type=int,
         default=65535,
         help="Maximum vCPUs.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--mem-min",
         type=float,
         default=(-1),
         help="Minimum memory in GB.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--mem-max",
         type=float,
         default=65535,
         help="Maximum memory in GB.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--emr-only",
         action="store_true",
         default=False,
         help="Only instances supported by EMR.",
     )
     #
-    parser.add_argument(
+    filters_group.add_argument(
         "--inters-min",
         type=int,
         default=(-1),
         help="Minimum interruptions in percent.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--inters-max",
         type=int,
         default=101,
         help="Maximum interruptions in percent.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--savings-min",
         type=int,
         default=(-1),
         help="Minimum savings in percent.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--savings-max",
         type=int,
         default=101,
         help="Maximum savings in percent.",
     )
     #
-    group = parser.add_mutually_exclusive_group()
+    group = filters_group.add_mutually_exclusive_group()
     group.add_argument(
         "--exclude-metal",
         action="store_true",
@@ -217,7 +238,9 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Exclude Virtual Machine instances.",
     )
-    parser.add_argument(
+
+    others_group = parser.add_argument_group("others", None)
+    others_group.add_argument(
         "--data-dir",
         type=str,
         default=DATA_DIR,
@@ -226,24 +249,11 @@ def parse_args() -> argparse.Namespace:
             "stored."
         ),
     )
-    parser.add_argument(
+    others_group.add_argument(
         "--dataset-url",
         type=str,
         default=DATASET_URL,
         help="URL of AWS Spot dataset.",
-    )
-    parser.add_argument(
-        "--output-format",
-        choices=["csv", "json", "text"],
-        default="text",
-        help="Output format. Default is '%(default)s' format.",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="count",
-        default=0,
-        help="Increase log level verbosity. Can be passed multiple times.",
     )
 
     args = parser.parse_args()
