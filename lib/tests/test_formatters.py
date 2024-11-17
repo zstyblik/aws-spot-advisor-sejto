@@ -8,8 +8,16 @@ import sys
 
 import pytest
 
+from aws_spot_advisor_sejto import get_sorting_function
 from lib import formatters
 from lib.models import EC2InstanceType
+
+
+@pytest.fixture
+def fixture_sorter():
+    """Return sorting function."""
+    sort_order = {"inter_max": 1, "savings": (-1)}
+    yield get_sorting_function(sort_order)
 
 
 @pytest.mark.parametrize(
@@ -56,9 +64,9 @@ from lib.models import EC2InstanceType
         ),
     ],
 )
-def test_formatters_fmt_csv(results, expected_output, capsys):
+def test_formatters_fmt_csv(results, expected_output, capsys, fixture_sorter):
     """Test fmt_csv()."""
-    formatters.fmt_csv(results, sys.stdout)
+    formatters.fmt_csv(results, sys.stdout, fixture_sorter)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
@@ -129,9 +137,9 @@ def test_formatters_fmt_csv(results, expected_output, capsys):
         ({}, "[]"),
     ],
 )
-def test_formatters_fmt_json(results, expected_output, capsys):
+def test_formatters_fmt_json(results, expected_output, capsys, fixture_sorter):
     """Test fmt_json()."""
-    formatters.fmt_json(results, sys.stdout)
+    formatters.fmt_json(results, sys.stdout, fixture_sorter)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
@@ -189,9 +197,9 @@ def test_formatters_fmt_json(results, expected_output, capsys):
         ({}, "{}".format(os.linesep)),
     ],
 )
-def test_formatters_fmt_text(results, expected_output, capsys):
+def test_formatters_fmt_text(results, expected_output, capsys, fixture_sorter):
     """Test fmt_text()."""
-    formatters.fmt_text(results, sys.stdout)
+    formatters.fmt_text(results, sys.stdout, fixture_sorter)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output

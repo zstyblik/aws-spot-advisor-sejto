@@ -6,6 +6,7 @@
 import csv
 import dataclasses
 import json
+from collections.abc import Callable
 from typing import Dict
 from typing import IO
 
@@ -26,7 +27,9 @@ class SejtoJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def fmt_csv(results: Dict[str, EC2InstanceType], fhandle: IO) -> None:
+def fmt_csv(
+    results: Dict[str, EC2InstanceType], fhandle: IO, sorting_fn: Callable
+) -> None:
     """Write results into given file handle in CSV format."""
     # NOTE(zstyblik): we need to get fieldnames somehow.
     fake_instance = EC2InstanceType(instance_type="fake")
@@ -37,35 +40,31 @@ def fmt_csv(results: Dict[str, EC2InstanceType], fhandle: IO) -> None:
         extrasaction="ignore",
     )
     writer.writeheader()
-    for instance_type in sorted(
-        results.values(), key=lambda x: (x.inter_max, (-1) * x.savings)
-    ):
+    for instance_type in sorted(results.values(), key=sorting_fn):
         writer.writerow(instance_type.print_dict())
 
 
-def fmt_json(results: Dict[str, EC2InstanceType], fhandle: IO) -> None:
+def fmt_json(
+    results: Dict[str, EC2InstanceType], fhandle: IO, sorting_fn: Callable
+) -> None:
     """Write results into given file handle in JSON format."""
     json.dump(
-        list(
-            sorted(
-                results.values(), key=lambda x: (x.inter_max, (-1) * x.savings)
-            )
-        ),
+        list(sorted(results.values(), key=sorting_fn)),
         fhandle,
         indent=4,
         cls=SejtoJSONEncoder,
     )
 
 
-def fmt_text(results: Dict[str, EC2InstanceType], fhandle: IO) -> None:
+def fmt_text(
+    results: Dict[str, EC2InstanceType], fhandle: IO, sorting_fn: Callable
+) -> None:
     """Write results into given file handle in text format."""
     if not results:
         print("", file=fhandle)
         return
 
-    for instance_type in sorted(
-        results.values(), key=lambda x: (x.inter_max, (-1) * x.savings)
-    ):
+    for instance_type in sorted(results.values(), key=sorting_fn):
         print(
             "instance_type={instance_type:s} vcpus={vcpus:d} "
             "mem_gb={mem_gb:.1f} savings={savings:d}% "

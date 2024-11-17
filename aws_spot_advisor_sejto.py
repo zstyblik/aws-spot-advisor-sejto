@@ -80,6 +80,21 @@ def get_dataset(
     return dataset
 
 
+def get_sorting_function(sort_order: Dict[str, int]):
+    """Return function for sorting."""
+
+    def sorter(instance_type: EC2InstanceType):
+        """Make EC2InstanceType sortable."""
+        return tuple(
+            (
+                value * getattr(instance_type, key)
+                for key, value in sort_order.items()
+            )
+        )
+
+    return sorter
+
+
 def main():
     """Get data, filter data and print results."""
     args = parse_args()
@@ -126,7 +141,8 @@ def main():
         logger.error("%s", exception.message)
         sys.exit(1)
 
-    print_out_fn(results, sys.stdout)
+    sorter = get_sorting_function(args.parsed_sort_order)
+    print_out_fn(results, sys.stdout, sorter)
 
 
 def parse_args() -> argparse.Namespace:
@@ -239,6 +255,21 @@ def parse_args() -> argparse.Namespace:
         help="Exclude Virtual Machine instances.",
     )
 
+    sorting_group = parser.add_argument_group("sorting", None)
+    sorting_group.add_argument(
+        "--sort-order",
+        type=str,
+        default="interrupts:asc,savings:desc",
+        help=(
+            "Specify how to sort results. "
+            "Expected format is 'columnA:sort_order,columnB:sort_order,...'. "
+            "Valid columns are instance_type, vcpus, mem_gb, emr, savings, "
+            "interrupts. "
+            "Valid sort orders are asc or desc. "
+            "Default is '%(default)s'."
+        ),
+    )
+
     others_group = parser.add_argument_group("others", None)
     others_group.add_argument(
         "--data-dir",
@@ -258,7 +289,70 @@ def parse_args() -> argparse.Namespace:
 
     args = parser.parse_args()
     args.log_level = calc_log_level(args.verbose)
+    try:
+        args.parsed_sort_order = parse_sort_order(args.sort_order)
+        if not args.parsed_sort_order:
+            raise ValueError("No sort order at all. That's impossible!")
+    except ValueError as exception:
+        parser.error(str(exception))
+
     return args
+
+
+def parse_sort_order(input_data: str) -> Dict[str, int]:
+    """Return parsed and processed sort order provided by user as a dictionary.
+
+    :raises ValueError: raised on invalid data is detected.
+    """
+    order_lookup = {
+        "asc": 1,
+        "desc": (-1),
+    }
+    # For attribute remapping.
+    column_lookup = {
+        "instance_type": "instance_type",
+        "vcpus": "vcpus",
+        "mem_gb": "mem_gb",
+        "emr": "emr",
+        "savings": "savings",
+        "interrupts": "inter_max",
+    }
+    retval = {}
+    for chunk in input_data.split(","):
+        if ":" not in chunk:
+            raise ValueError(
+                "Input format must be 'column:sort_order', not '{:s}'.".format(
+                    chunk
+                )
+            )
+
+        column_name, order = chunk.split(":", maxsplit=1)
+        column_name = column_name.lower()
+        order = order.lower()
+        if column_name not in column_lookup:
+            raise ValueError(
+                "Column '{:s}' is invalid. Valid columns "
+                "are {:s}.".format(
+                    column_name,
+                    ", ".join(["'{:s}'".format(key) for key in column_lookup]),
+                ),
+            )
+
+        if order not in order_lookup:
+            raise ValueError(
+                "Sort order '{:s}' is invalid. Valid "
+                "values are {:s}.".format(
+                    order,
+                    ", ".join(
+                        ["'{:s}'".format(key) for key in order_lookup],
+                    ),
+                ),
+            )
+
+        column_name = column_lookup.get(column_name)
+        retval[column_name] = order_lookup.get(order)
+
+    return retval
 
 
 def select_data(
