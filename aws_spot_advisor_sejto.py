@@ -149,6 +149,9 @@ def parse_args() -> argparse.Namespace:
     """Return parsed CLI args."""
     parser = argparse.ArgumentParser(
         allow_abbrev=False,
+        description=(
+            "Sejto - slightly better filtering of AWS Spot Advisor's data."
+        ),
         epilog="AWS Spot Advisor Sejto by Zdenek Styblik",
     )
     parser.add_argument(
