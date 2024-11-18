@@ -11,6 +11,7 @@ from unittest.mock import Mock  # noqa: I100
 from unittest.mock import patch
 
 import pytest
+from requests.exceptions import BaseHTTPError
 
 import aws_spot_advisor_sejto as sejto
 from lib import dataset
@@ -145,6 +146,98 @@ def test_main(mock_get_dataset, capsys, caplog):
 
 
 @patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_get_dataset_http_exception(mock_get_dataset, capsys, caplog):
+    """Test handling of requests' exception from get_dataset()."""
+    region = "us-east-1"
+    os_name = "Linux"
+    expected_log_tuples = [
+        (
+            "aws_spot_advisor_sejto",
+            40,
+            (
+                "Failed to get AWS Spot Advisor data due to exception: "
+                "404 Client Error: Not Found for url: "
+                "https://www.example.com/abc123"
+            ),
+        ),
+    ]
+
+    http_error = BaseHTTPError(
+        "404 Client Error: Not Found for url: https://www.example.com/abc123"
+    )
+    mock_get_dataset.side_effect = http_error
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--region",
+        region,
+        "--os",
+        os_name,
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_get_dataset_oserror_exception(mock_get_dataset, capsys, caplog):
+    """Test handling of OSError exception from get_dataset()."""
+    region = "us-east-1"
+    os_name = "Linux"
+    expected_log_tuples = [
+        (
+            "aws_spot_advisor_sejto",
+            40,
+            (
+                "Failed to get AWS Spot Advisor data due to exception: "
+                "[Errno 2] No such file or directory: 'test.pytest'"
+            ),
+        )
+    ]
+
+    file_error = FileNotFoundError()
+    file_error.errno = 2
+    file_error.filename = "test.pytest"
+    file_error.strerror = "No such file or directory"
+    mock_get_dataset.side_effect = file_error
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--region",
+        region,
+        "--os",
+        os_name,
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@patch("aws_spot_advisor_sejto.get_dataset")
 def test_main_has_region_check(mock_get_dataset, capsys, caplog):
     """Test that region check works as execpted in main()."""
     region = "us-east-1"
@@ -237,53 +330,131 @@ def test_main_has_os_check(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
-def test_print_out(capsys):
-    """Test print_out()."""
-    results = {
-        "t3.nano": {
-            "instance_type": "t3.nano",
-            "cores": 0,
-            "ram_gb": 0,
-            "savings": 80,
-            "inter_label": "5-10%",
-            "inter_max": 11,
-        },
-        "t2.nano": {
-            "instance_type": "t2.nano",
-            "cores": 0,
-            "ram_gb": 0,
-            "savings": 76,
-            "inter_label": "<5%",
-            "inter_max": 5,
-        },
-        "t2.large": {
-            "instance_type": "t2.large",
-            "cores": 0,
-            "ram_gb": 0,
-            "savings": 75,
-            "inter_label": "<5%",
-            "inter_max": 5,
-        },
-    }
-    expected_output = os.linesep.join(
-        [
-            (
-                "instance_type=t2.nano vcpus=0 mem_gb=0.0 savings=76% "
-                "interrupts=<5%"
-            ),
-            (
-                "instance_type=t2.large vcpus=0 mem_gb=0.0 savings=75% "
-                "interrupts=<5%"
-            ),
-            (
-                "instance_type=t3.nano vcpus=0 mem_gb=0.0 savings=80% "
-                "interrupts=5-10%"
-            ),
-            "",
-        ]
-    )
+def test_parse_args_sort_oder_exc(capsys):
+    """Test that parse_args() handles ValueError exception as expected.
 
-    sejto.print_out(results)
+    parse_sort_order() raises ValueError exception which should be handled as an
+    error message and SystemExit RC=2.
+    """
+    region = "us-east-1"
+    os_name = "Linux"
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--region",
+        region,
+        "--os",
+        os_name,
+        "--sort-order",
+        "pytest:pytest",
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.parse_args()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 2
 
     captured = capsys.readouterr()
-    assert captured.out == expected_output
+    assert captured.out == ""
+    assert "Column 'pytest' is invalid. Valid columns are" in captured.err
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        (
+            "interrupts:asc,savings:desc",
+            {
+                "inter_max": 1,
+                "savings": (-1),
+            },
+        ),
+        (
+            "interrupts:desc,savings:asc",
+            {
+                "inter_max": (-1),
+                "savings": 1,
+            },
+        ),
+        (
+            "instance_type:asc,vcpus:asc,mem_gb:asc,savings:asc,interrupts:asc",
+            {
+                "instance_type": 1,
+                "vcpus": 1,
+                "mem_gb": 1,
+                "savings": 1,
+                "inter_max": 1,
+            },
+        ),
+    ],
+)
+def test_parse_sort_order(input_data, expected):
+    """Test parse_sort_order() under ideal conditions."""
+    results = sejto.parse_sort_order(input_data)
+    print(results)
+    assert results == expected
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        ("", "Input format must be 'column:sort_order', not ''."),
+        (
+            ":",
+            (
+                "Column '' is invalid. Valid columns are "
+                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
+                "'interrupts'."
+            ),
+        ),
+        (
+            "::",
+            (
+                "Column '' is invalid. Valid columns are "
+                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
+                "'interrupts'."
+            ),
+        ),
+        ("pytest", "Input format must be 'column:sort_order', not 'pytest'."),
+        (
+            ":pytest",
+            (
+                "Column '' is invalid. Valid columns are "
+                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
+                "'interrupts'."
+            ),
+        ),
+        (
+            "pytest:",
+            (
+                "Column 'pytest' is invalid. Valid columns are "
+                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
+                "'interrupts'."
+            ),
+        ),
+        (
+            "vcpus:pytest:pytest",
+            (
+                "Sort order 'pytest:pytest' is invalid. "
+                "Valid values are 'asc', 'desc'."
+            ),
+        ),
+        (
+            "vcpus:pytest",
+            (
+                "Sort order 'pytest' is invalid. "
+                "Valid values are 'asc', 'desc'."
+            ),
+        ),
+    ],
+)
+def test_parse_sort_order_exceptions(input_data, expected):
+    """Test exceptions and input validation in parse_sort_order()."""
+    with pytest.raises(ValueError) as excinfo:
+        sejto.parse_sort_order(input_data)
+
+    assert expected == str(excinfo.value)

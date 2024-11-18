@@ -31,6 +31,7 @@ on top of that Sejto enables you to:
 * filter by min/max interrupts
 * filter by min/max savings
 * filter out either bare metal or VM instances
+* output in text, CSV and JSON format
 
 ## Example usage
 
@@ -82,12 +83,10 @@ instance_type=r7iz.large vcpus=2 mem_gb=16.0 savings=60% interrupts=5-10%
 
 ## Possible planned features
 
-* allow user to specify sort order and sort by multiple columns
 * filter by generation
 * include/exclude Graviton instances, perhaps even Intel/AMD
 * even more filtering?
 * show cost/pricing
-* CSV and JSON formatting
 * web UI
 
 ## Data structures

@@ -13,14 +13,23 @@ import sys
 from typing import Any
 from typing import Dict
 
+from requests.exceptions import BaseHTTPError
+
 from lib import conf
 from lib import filters
+from lib import formatters
 from lib.dataset import DataSet
+from lib.models import EC2InstanceType
 
 CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
 DATA_DIR = os.path.dirname(os.path.realpath(__file__))
 DATASET_FNAME = "spot-advisor-data.json"
 DATASET_URL = "https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json"
+FORMATTERS = {
+    "csv": formatters.fmt_csv,
+    "json": formatters.fmt_json,
+    "text": formatters.fmt_text,
+}
 
 
 class DataProcessingException(Exception):
@@ -42,7 +51,11 @@ def calc_log_level(count: int) -> int:
 def get_dataset(
     config_fpath: str, dataset_fpath: str, dataset_url: str
 ) -> DataSet:
-    """Return AWS Spot Advisor dataset."""
+    """Return AWS Spot Advisor dataset.
+
+    :raises requests.exceptions.BaseHTTPError: when fetching data over HTTP
+    :raises OSError: when reading/writing data
+    """
     config = conf.new()
     _ = config.read(config_fpath)
 
@@ -67,19 +80,49 @@ def get_dataset(
     return dataset
 
 
+def get_sorting_function(sort_order: Dict[str, int]):
+    """Return function for sorting."""
+
+    def sorter(instance_type: EC2InstanceType):
+        """Make EC2InstanceType sortable."""
+        return tuple(
+            (
+                value * getattr(instance_type, key)
+                for key, value in sort_order.items()
+            )
+        )
+
+    return sorter
+
+
 def main():
     """Get data, filter data and print results."""
     args = parse_args()
     logging.basicConfig(level=args.log_level, stream=sys.stderr)
     logger = logging.getLogger("aws_spot_advisor_sejto")
+    if args.output_format not in FORMATTERS:
+        logging.error(
+            "Output format '%s' is not supported.", args.output_format
+        )
+        sys.exit(1)
 
+    print_out_fn = FORMATTERS[args.output_format]
     config_fpath = os.path.join(args.data_dir, CONFIG_FNAME)
     logger.debug("Config file '%s'.", config_fpath)
 
     dataset_fpath = os.path.join(args.data_dir, DATASET_FNAME)
     logger.debug("Dataset file '%s'.", dataset_fpath)
 
-    dataset = get_dataset(config_fpath, dataset_fpath, args.dataset_url)
+    try:
+        dataset = get_dataset(config_fpath, dataset_fpath, args.dataset_url)
+    except (BaseHTTPError, OSError) as exception:
+        logger.error(
+            "Failed to get AWS Spot Advisor data due to exception: %s",
+            exception,
+            exc_info=1,
+        )
+        sys.exit(1)
+
     if not dataset.has_region(args.region):
         logger.error("Region '%s' not found in data.", args.region)
         sys.exit(1)
@@ -98,14 +141,25 @@ def main():
         logger.error("%s", exception.message)
         sys.exit(1)
 
-    print_out(results)
+    sorter = get_sorting_function(args.parsed_sort_order)
+    print_out_fn(results, sys.stdout, sorter)
 
 
 def parse_args() -> argparse.Namespace:
     """Return parsed CLI args."""
     parser = argparse.ArgumentParser(
         allow_abbrev=False,
-        epilog="NOTE that AWS provides very rough estimate of interruptions.",
+        description=(
+            "Sejto - slightly better filtering of AWS Spot Advisor's data."
+        ),
+        epilog="AWS Spot Advisor Sejto by Zdenek Styblik",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase log level verbosity. Can be passed multiple times.",
     )
     parser.add_argument(
         "--region",
@@ -121,62 +175,76 @@ def parse_args() -> argparse.Namespace:
         help="Operating System. Default is 'Linux'.",
     )
     parser.add_argument(
+        "--output-format",
+        choices=["csv", "json", "text"],
+        default="text",
+        help="Output format. Default is '%(default)s' format.",
+    )
+
+    filters_group = parser.add_argument_group(
+        "filters",
+        (
+            "options for AWS Spot Advisor data filtering. "
+            "NOTE that AWS provides very rough estimate of interruptions."
+        ),
+    )
+    filters_group.add_argument(
         "--vcpu-min",
         type=int,
         default=(-1),
         help="Minimum vCPUs.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--vcpu-max",
         type=int,
         default=65535,
         help="Maximum vCPUs.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--mem-min",
         type=float,
         default=(-1),
         help="Minimum memory in GB.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--mem-max",
         type=float,
         default=65535,
         help="Maximum memory in GB.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--emr-only",
         action="store_true",
         default=False,
         help="Only instances supported by EMR.",
     )
     #
-    parser.add_argument(
+    filters_group.add_argument(
         "--inters-min",
         type=int,
         default=(-1),
         help="Minimum interruptions in percent.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--inters-max",
         type=int,
         default=101,
         help="Maximum interruptions in percent.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--savings-min",
         type=int,
         default=(-1),
         help="Minimum savings in percent.",
     )
-    parser.add_argument(
+    filters_group.add_argument(
         "--savings-max",
         type=int,
         default=101,
         help="Maximum savings in percent.",
     )
     #
-    group = parser.add_mutually_exclusive_group()
+    group = filters_group.add_mutually_exclusive_group()
     group.add_argument(
         "--exclude-metal",
         action="store_true",
@@ -189,7 +257,24 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Exclude Virtual Machine instances.",
     )
-    parser.add_argument(
+
+    sorting_group = parser.add_argument_group("sorting", None)
+    sorting_group.add_argument(
+        "--sort-order",
+        type=str,
+        default="interrupts:asc,savings:desc",
+        help=(
+            "Specify how to sort results. "
+            "Expected format is 'columnA:sort_order,columnB:sort_order,...'. "
+            "Valid columns are instance_type, vcpus, mem_gb, emr, savings, "
+            "interrupts. "
+            "Valid sort orders are asc or desc. "
+            "Default is '%(default)s'."
+        ),
+    )
+
+    others_group = parser.add_argument_group("others", None)
+    others_group.add_argument(
         "--data-dir",
         type=str,
         default=DATA_DIR,
@@ -198,41 +283,79 @@ def parse_args() -> argparse.Namespace:
             "stored."
         ),
     )
-    parser.add_argument(
+    others_group.add_argument(
         "--dataset-url",
         type=str,
         default=DATASET_URL,
         help="URL of AWS Spot dataset.",
     )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="count",
-        default=0,
-        help="Increase log level verbosity. Can be passed multiple times.",
-    )
 
     args = parser.parse_args()
     args.log_level = calc_log_level(args.verbose)
+    try:
+        args.parsed_sort_order = parse_sort_order(args.sort_order)
+        if not args.parsed_sort_order:
+            raise ValueError("No sort order at all. That's impossible!")
+    except ValueError as exception:
+        parser.error(str(exception))
+
     return args
 
 
-def print_out(results) -> None:
-    """Print out results."""
-    # NOTE(zstyblik): notice minus sign inside sorted!!!
-    for value in sorted(
-        results.values(), key=lambda x: (x["inter_max"], (-1) * x["savings"])
-    ):
-        print(
-            "instance_type={:s} vcpus={:d} mem_gb={:.1f} savings={:d}% "
-            "interrupts={:s}".format(
-                value["instance_type"],
-                value["cores"],
-                value["ram_gb"],
-                value["savings"],
-                value["inter_label"],
+def parse_sort_order(input_data: str) -> Dict[str, int]:
+    """Return parsed and processed sort order provided by user as a dictionary.
+
+    :raises ValueError: raised on invalid data is detected.
+    """
+    order_lookup = {
+        "asc": 1,
+        "desc": (-1),
+    }
+    # For attribute remapping.
+    column_lookup = {
+        "instance_type": "instance_type",
+        "vcpus": "vcpus",
+        "mem_gb": "mem_gb",
+        "emr": "emr",
+        "savings": "savings",
+        "interrupts": "inter_max",
+    }
+    retval = {}
+    for chunk in input_data.split(","):
+        if ":" not in chunk:
+            raise ValueError(
+                "Input format must be 'column:sort_order', not '{:s}'.".format(
+                    chunk
+                )
             )
-        )
+
+        column_name, order = chunk.split(":", maxsplit=1)
+        column_name = column_name.lower()
+        order = order.lower()
+        if column_name not in column_lookup:
+            raise ValueError(
+                "Column '{:s}' is invalid. Valid columns "
+                "are {:s}.".format(
+                    column_name,
+                    ", ".join(["'{:s}'".format(key) for key in column_lookup]),
+                ),
+            )
+
+        if order not in order_lookup:
+            raise ValueError(
+                "Sort order '{:s}' is invalid. Valid "
+                "values are {:s}.".format(
+                    order,
+                    ", ".join(
+                        ["'{:s}'".format(key) for key in order_lookup],
+                    ),
+                ),
+            )
+
+        column_name = column_lookup.get(column_name)
+        retval[column_name] = order_lookup.get(order)
+
+    return retval
 
 
 def select_data(
@@ -262,7 +385,12 @@ def select_data(
     }
     # NOTE(zstyblik): filter on pre-filter results, vCPUs, RAM, EMR
     results = {
-        key: values
+        key: EC2InstanceType(
+            instance_type=key,
+            emr=values["emr"],
+            vcpus=values["cores"],
+            mem_gb=values["ram_gb"],
+        )
         for key, values in data["instance_types"].items()
         if (
             key in available_instances
@@ -295,13 +423,12 @@ def select_data(
             )
             raise DataProcessingException(message=message)
 
-        extra_data = {
-            "savings": int(available_instances[key]["s"]),
-            "inter_label": interrupts[inter_range]["label"],
-            "inter_max": int(interrupts[inter_range]["max"]),
-        }
-        results[key].update(extra_data)
-        results[key].update({"instance_type": key})
+        # NOTE(zstyblik): savings can be(= tested it) moved into previous loop.
+        results[key].savings = int(available_instances[key]["s"])
+        # NOTE(zstyblik): re-think how to move these elsewhere(lookup function,
+        # pre-process data etc.) and get rid off this whole loop.
+        results[key].inter_label = interrupts[inter_range]["label"]
+        results[key].inter_max = int(interrupts[inter_range]["max"])
 
     return results
 

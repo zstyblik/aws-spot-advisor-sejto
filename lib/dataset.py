@@ -109,6 +109,8 @@ class DataSet:
 
         This function might raise OSError or requests' related exceptions.
 
+        :raises requests.exceptions.BaseHTTPError: when fetching data over HTTP
+        :raises OSError: when reading/writing data
         :raises ValueError: if HTTP Status code isn't 200 or 304
         """
         caching_headers = self.make_caching_headers()
@@ -174,9 +176,10 @@ def get_data(
         for key, value in extra_headers.items():
             headers[key] = value
 
-    module_logger.debug("HTTP GET %s", url)
-    module_logger.debug("HTTP Headers %s", headers)
+    module_logger.debug("HTTP req GET %s", url)
+    module_logger.debug("HTTP req Headers %s", headers)
     rsp = requests.get(url, timeout=timeout, headers=headers)
-    module_logger.debug("Got HTTP Status Code: %i", rsp.status_code)
+    module_logger.debug("HTTP rsp Status Code: %i", rsp.status_code)
+    module_logger.debug("HTTP rsp Headers: %s", rsp.headers)
     rsp.raise_for_status()
     return rsp
