@@ -181,5 +181,4 @@ def get_data(
     rsp = requests.get(url, timeout=timeout, headers=headers)
     module_logger.debug("HTTP rsp Status Code: %i", rsp.status_code)
     module_logger.debug("HTTP rsp Headers: %s", rsp.headers)
-    rsp.raise_for_status()
     return rsp
