@@ -330,6 +330,96 @@ def test_main_has_os_check(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
+@pytest.mark.parametrize(
+    "output_format,expected_output",
+    [
+        (
+            "text",
+            os.linesep.join(
+                [
+                    "region=eu-central-1 operating_systems=Linux",
+                    "region=us-east-1 operating_systems=Linux,Windows",
+                    "",
+                ],
+            ),
+        ),
+        (
+            "csv",
+            (
+                "region,operating_systems\r\n"
+                "eu-central-1,Linux\r\n"
+                'us-east-1,"Linux,Windows"\r\n'
+            ),
+        ),
+        (
+            "json",
+            os.linesep.join(
+                [
+                    "[",
+                    "    {",
+                    '        "operating_systems": [',
+                    '            "Linux"',
+                    "        ],",
+                    '        "region": "eu-central-1"',
+                    "    },",
+                    "    {",
+                    '        "operating_systems": [',
+                    '            "Linux",',
+                    '            "Windows"',
+                    "        ],",
+                    '        "region": "us-east-1"',
+                    "    }",
+                    "]",
+                ]
+            ),
+        ),
+    ],
+)
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_list_regions(
+    mock_get_dataset, output_format, expected_output, capsys, caplog
+):
+    """Test that --list-regions works as expected."""
+    expected_log_tuples = []
+
+    data = {
+        "spot_advisor": {
+            "us-east-1": {
+                "Linux": {
+                    "t3.nano": {"s": 80, "r": 1},
+                },
+                "Windows": {
+                    "t3.nano": {"s": 80, "r": 1},
+                },
+            },
+            "eu-central-1": {
+                "Linux": {
+                    "t3.nano": {"s": 80, "r": 1},
+                },
+            },
+        },
+    }
+    mock_dset = dataset.DataSet(data=data)
+    mock_get_dataset.return_value = mock_dset
+
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--list-regions",
+        "--output-format",
+        output_format,
+    ]
+    with patch.object(sys, "argv", args):
+        sejto.main()
+
+    assert mock_get_dataset.called is True
+
+    captured = capsys.readouterr()
+    assert captured.out == expected_output
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
 def test_parse_args_sort_oder_exc(capsys):
     """Test that parse_args() handles ValueError exception as expected.
 

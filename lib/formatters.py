@@ -11,6 +11,7 @@ from typing import Dict
 from typing import IO
 
 from .models import EC2InstanceType
+from .models import RegionDetail
 
 
 class SejtoJSONEncoder(json.JSONEncoder):
@@ -71,3 +72,87 @@ def fmt_text(
             "interrupts={interrupts:s}".format(**instance_type.print_dict()),
             file=fhandle,
         )
+
+
+class RegionDetailFormatter:
+    """Formatter for RegionDetail results."""
+
+    csv_fields = ["region", "operating_systems"]
+
+    def __init__(self, output_format: str, fhandle: IO, sorting_fn: Callable):
+        """Init."""
+        self.output_formats = {
+            "csv": self.fmt_csv,
+            "json": self.fmt_json,
+            "text": self.fmt_text,
+        }
+        self.output_format = output_format
+        self.fhandle = fhandle
+        self.sorting_fn = sorting_fn
+
+    @property
+    def output_format(self):
+        """Defines in which format results will be printed out.
+
+        :raises ValueError: on unsupported or invalid format
+        """
+        return self.__output_format
+
+    @output_format.setter
+    def output_format(self, val: str):
+        """Setter for output format."""
+        if val not in self.output_formats:
+            raise ValueError("Output format '{}' is not supported".format(val))
+
+        self.__output_format = val
+
+    def fmt(self, results: Dict[str, RegionDetail]) -> None:
+        """Format results.
+
+        Results will be written into `self.fhandle` in format specified by
+        `self.output_format`.
+        """
+        print_fn = self.output_formats.get(self.output_format)
+        print_fn(results)
+
+    def fmt_csv(self, results: Dict[str, RegionDetail]) -> None:
+        """Write results in CSV format."""
+        writer = csv.DictWriter(
+            self.fhandle,
+            self.csv_fields,
+            extrasaction="ignore",
+        )
+        writer.writeheader()
+        for region in sorted(results.values(), key=self.sorting_fn):
+            writer.writerow(
+                {
+                    "region": region.region,
+                    "operating_systems": ",".join(region.operating_systems),
+                }
+            )
+
+    def fmt_json(self, results: Dict[str, RegionDetail]) -> None:
+        """Write results in JSON format."""
+        json.dump(
+            list(sorted(results.values(), key=self.sorting_fn)),
+            self.fhandle,
+            indent=4,
+            sort_keys=True,
+            cls=SejtoJSONEncoder,
+        )
+
+    def fmt_text(self, results: Dict[str, RegionDetail]) -> None:
+        """Write results in text format."""
+        if not results:
+            print("", file=self.fhandle)
+            return
+
+        for region in sorted(results.values(), key=self.sorting_fn):
+            print(
+                "region={region:s} "
+                "operating_systems={operating_systems:s}".format(
+                    region=region.region,
+                    operating_systems=",".join(region.operating_systems),
+                ),
+                file=self.fhandle,
+            )

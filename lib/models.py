@@ -38,3 +38,11 @@ class EC2InstanceType:
             "savings": self.savings,
             "interrupts": self.inter_label,
         }
+
+
+@dataclass
+class RegionDetail:
+    """Class represents AWS Region with the list of supported OS-es."""
+
+    region: str
+    operating_systems: list

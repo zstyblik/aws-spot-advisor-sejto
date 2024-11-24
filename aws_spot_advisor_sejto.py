@@ -20,6 +20,7 @@ from lib import filters
 from lib import formatters
 from lib.dataset import DataSet
 from lib.models import EC2InstanceType
+from lib.models import RegionDetail
 
 CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
 DATA_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -95,6 +96,25 @@ def get_sorting_function(sort_order: Dict[str, int]):
     return sorter
 
 
+def list_regions(dataset: DataSet, output_format: str) -> None:
+    """Print AWS regions and available OS-es in these regions."""
+    results = {
+        region: RegionDetail(
+            region=region,
+            operating_systems=sorted(
+                list(dataset.data["spot_advisor"][region].keys())
+            ),
+        )
+        for region in dataset.data["spot_advisor"]
+    }
+    formatter = formatters.RegionDetailFormatter(
+        output_format,
+        sys.stdout,
+        sorting_fn=lambda region_detail: region_detail.region,
+    )
+    formatter.fmt(results)
+
+
 def main():
     """Get data, filter data and print results."""
     args = parse_args()
@@ -123,26 +143,32 @@ def main():
         )
         sys.exit(1)
 
-    if not dataset.has_region(args.region):
-        logger.error("Region '%s' not found in data.", args.region)
-        sys.exit(1)
+    if args.list_regions:
+        list_regions(dataset, args.output_format)
+    elif args.region:
+        if not dataset.has_region(args.region):
+            logger.error("Region '%s' not found in data.", args.region)
+            sys.exit(1)
 
-    if not dataset.has_os(args.region, args.os):
-        logger.error(
-            "OS '%s' is not available in region '%s'.",
-            args.os,
-            args.region,
-        )
-        sys.exit(1)
+        if not dataset.has_os(args.region, args.os):
+            logger.error(
+                "OS '%s' is not available in region '%s'.",
+                args.os,
+                args.region,
+            )
+            sys.exit(1)
 
-    try:
-        results = select_data(dataset.data, args)
-    except DataProcessingException as exception:
-        logger.error("%s", exception.message)
-        sys.exit(1)
+        try:
+            results = select_data(dataset.data, args)
+        except DataProcessingException as exception:
+            logger.error("%s", exception.message)
+            sys.exit(1)
 
-    sorter = get_sorting_function(args.parsed_sort_order)
-    print_out_fn(results, sys.stdout, sorter)
+        sorter = get_sorting_function(args.parsed_sort_order)
+        print_out_fn(results, sys.stdout, sorter)
+    else:
+        logger.error("No action given and I don't know what to do.")
+        sys.exit(1)
 
 
 def parse_args() -> argparse.Namespace:
@@ -161,12 +187,20 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Increase log level verbosity. Can be passed multiple times.",
     )
-    parser.add_argument(
+
+    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument(
+        "--list-regions",
+        action="store_true",
+        default=False,
+        help="List AWS regions and available Operating Systems.",
+    )
+    action_group.add_argument(
         "--region",
         type=str,
-        required=True,
         help="AWS Region.",
     )
+
     parser.add_argument(
         "--os",
         type=str,
