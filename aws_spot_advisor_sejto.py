@@ -26,11 +26,6 @@ CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
 DATA_DIR = os.path.dirname(os.path.realpath(__file__))
 DATASET_FNAME = "spot-advisor-data.json"
 DATASET_URL = "https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json"
-FORMATTERS = {
-    "csv": formatters.fmt_csv,
-    "json": formatters.fmt_json,
-    "text": formatters.fmt_text,
-}
 
 
 class DataProcessingException(Exception):
@@ -120,13 +115,7 @@ def main():
     args = parse_args()
     logging.basicConfig(level=args.log_level, stream=sys.stderr)
     logger = logging.getLogger("aws_spot_advisor_sejto")
-    if args.output_format not in FORMATTERS:
-        logging.error(
-            "Output format '%s' is not supported.", args.output_format
-        )
-        sys.exit(1)
 
-    print_out_fn = FORMATTERS[args.output_format]
     config_fpath = os.path.join(args.data_dir, CONFIG_FNAME)
     logger.debug("Config file '%s'.", config_fpath)
 
@@ -165,7 +154,12 @@ def main():
             sys.exit(1)
 
         sorter = get_sorting_function(args.parsed_sort_order)
-        print_out_fn(results, sys.stdout, sorter)
+        formatter = formatters.EC2InstanceTypeFormatter(
+            output_format=args.output_format,
+            fhandle=sys.stdout,
+            sorting_fn=sorter,
+        )
+        formatter.fmt(results)
     else:
         logger.error("No action given and I don't know what to do.")
         sys.exit(1)

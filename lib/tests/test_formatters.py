@@ -65,9 +65,16 @@ def fixture_sorter():
         ),
     ],
 )
-def test_formatters_fmt_csv(results, expected_output, capsys, fixture_sorter):
+def test_ec2it_formatter_fmt_csv(
+    results, expected_output, capsys, fixture_sorter
+):
     """Test fmt_csv()."""
-    formatters.fmt_csv(results, sys.stdout, fixture_sorter)
+    formatter = formatters.EC2InstanceTypeFormatter(
+        output_format="csv",
+        fhandle=sys.stdout,
+        sorting_fn=fixture_sorter,
+    )
+    formatter.fmt(results)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
@@ -138,9 +145,16 @@ def test_formatters_fmt_csv(results, expected_output, capsys, fixture_sorter):
         ({}, "[]"),
     ],
 )
-def test_formatters_fmt_json(results, expected_output, capsys, fixture_sorter):
+def test_ec2it_formatter_fmt_json(
+    results, expected_output, capsys, fixture_sorter
+):
     """Test fmt_json()."""
-    formatters.fmt_json(results, sys.stdout, fixture_sorter)
+    formatter = formatters.EC2InstanceTypeFormatter(
+        output_format="json",
+        fhandle=sys.stdout,
+        sorting_fn=fixture_sorter,
+    )
+    formatter.fmt(results)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
@@ -198,9 +212,16 @@ def test_formatters_fmt_json(results, expected_output, capsys, fixture_sorter):
         ({}, "{}".format(os.linesep)),
     ],
 )
-def test_formatters_fmt_text(results, expected_output, capsys, fixture_sorter):
+def test_ec2it_formatter_fmt_text(
+    results, expected_output, capsys, fixture_sorter
+):
     """Test fmt_text()."""
-    formatters.fmt_text(results, sys.stdout, fixture_sorter)
+    formatter = formatters.EC2InstanceTypeFormatter(
+        output_format="text",
+        fhandle=sys.stdout,
+        sorting_fn=fixture_sorter,
+    )
+    formatter.fmt(results)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
