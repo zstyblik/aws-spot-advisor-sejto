@@ -11,6 +11,7 @@ import pytest
 from aws_spot_advisor_sejto import get_sorting_function
 from lib import formatters
 from lib.models import EC2InstanceType
+from lib.models import RegionDetail
 
 
 @pytest.fixture
@@ -64,9 +65,16 @@ def fixture_sorter():
         ),
     ],
 )
-def test_formatters_fmt_csv(results, expected_output, capsys, fixture_sorter):
+def test_ec2it_formatter_fmt_csv(
+    results, expected_output, capsys, fixture_sorter
+):
     """Test fmt_csv()."""
-    formatters.fmt_csv(results, sys.stdout, fixture_sorter)
+    formatter = formatters.EC2InstanceTypeFormatter(
+        output_format="csv",
+        fhandle=sys.stdout,
+        sorting_fn=fixture_sorter,
+    )
+    formatter.fmt(results)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
@@ -137,9 +145,16 @@ def test_formatters_fmt_csv(results, expected_output, capsys, fixture_sorter):
         ({}, "[]"),
     ],
 )
-def test_formatters_fmt_json(results, expected_output, capsys, fixture_sorter):
+def test_ec2it_formatter_fmt_json(
+    results, expected_output, capsys, fixture_sorter
+):
     """Test fmt_json()."""
-    formatters.fmt_json(results, sys.stdout, fixture_sorter)
+    formatter = formatters.EC2InstanceTypeFormatter(
+        output_format="json",
+        fhandle=sys.stdout,
+        sorting_fn=fixture_sorter,
+    )
+    formatter.fmt(results)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
@@ -197,9 +212,171 @@ def test_formatters_fmt_json(results, expected_output, capsys, fixture_sorter):
         ({}, "{}".format(os.linesep)),
     ],
 )
-def test_formatters_fmt_text(results, expected_output, capsys, fixture_sorter):
+def test_ec2it_formatter_fmt_text(
+    results, expected_output, capsys, fixture_sorter
+):
     """Test fmt_text()."""
-    formatters.fmt_text(results, sys.stdout, fixture_sorter)
+    formatter = formatters.EC2InstanceTypeFormatter(
+        output_format="text",
+        fhandle=sys.stdout,
+        sorting_fn=fixture_sorter,
+    )
+    formatter.fmt(results)
 
     captured = capsys.readouterr()
     assert captured.out == expected_output
+
+
+@pytest.mark.parametrize(
+    "results,expected_output",
+    [
+        (
+            {
+                "us-east-1": RegionDetail(
+                    region="us-east-1",
+                    operating_systems=["Linux", "Windows"],
+                ),
+                "eu-central-1": RegionDetail(
+                    region="eu-central-1",
+                    operating_systems=["Linux"],
+                ),
+            },
+            (
+                "region,operating_systems\r\n"
+                "eu-central-1,Linux\r\n"
+                'us-east-1,"Linux,Windows"\r\n'
+            ),
+        ),
+        ({}, "region,operating_systems\r\n"),
+    ],
+)
+def test_region_detail_formatter_csv(results, expected_output, capsys, caplog):
+    """Test that CSV output in RegionDetailFormatter() works as expected."""
+    expected_log_tuples = []
+
+    formatter = formatters.RegionDetailFormatter(
+        output_format="csv",
+        fhandle=sys.stdout,
+        sorting_fn=lambda region_detail: region_detail.region,
+    )
+    formatter.fmt(results)
+
+    captured = capsys.readouterr()
+    assert captured.out == expected_output
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@pytest.mark.parametrize(
+    "results,expected_output",
+    [
+        (
+            {
+                "us-east-1": RegionDetail(
+                    region="us-east-1",
+                    operating_systems=["Linux", "Windows"],
+                ),
+                "eu-central-1": RegionDetail(
+                    region="eu-central-1",
+                    operating_systems=["Linux"],
+                ),
+            },
+            os.linesep.join(
+                [
+                    "[",
+                    "    {",
+                    '        "operating_systems": [',
+                    '            "Linux"',
+                    "        ],",
+                    '        "region": "eu-central-1"',
+                    "    },",
+                    "    {",
+                    '        "operating_systems": [',
+                    '            "Linux",',
+                    '            "Windows"',
+                    "        ],",
+                    '        "region": "us-east-1"',
+                    "    }",
+                    "]",
+                ]
+            ),
+        ),
+        ({}, "[]"),
+    ],
+)
+def test_region_detail_formatter_json(results, expected_output, capsys, caplog):
+    """Test that JSON output in RegionDetailFormatter() works as expected."""
+    expected_log_tuples = []
+
+    formatter = formatters.RegionDetailFormatter(
+        output_format="json",
+        fhandle=sys.stdout,
+        sorting_fn=lambda region_detail: region_detail.region,
+    )
+    formatter.fmt(results)
+
+    captured = capsys.readouterr()
+    assert captured.out == expected_output
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@pytest.mark.parametrize(
+    "results,expected_output",
+    [
+        (
+            {
+                "us-east-1": RegionDetail(
+                    region="us-east-1",
+                    operating_systems=["Linux", "Windows"],
+                ),
+                "eu-central-1": RegionDetail(
+                    region="eu-central-1",
+                    operating_systems=["Linux"],
+                ),
+            },
+            os.linesep.join(
+                [
+                    "region=eu-central-1 operating_systems=Linux",
+                    "region=us-east-1 operating_systems=Linux,Windows",
+                    "",
+                ],
+            ),
+        ),
+        ({}, "{}".format(os.linesep)),
+    ],
+)
+def test_region_detail_formatter_text(results, expected_output, capsys, caplog):
+    """Test that TEXT output in RegionDetailFormatter() works as expected."""
+    expected_log_tuples = []
+
+    formatter = formatters.RegionDetailFormatter(
+        output_format="text",
+        fhandle=sys.stdout,
+        sorting_fn=lambda region_detail: region_detail.region,
+    )
+    formatter.fmt(results)
+
+    captured = capsys.readouterr()
+    assert captured.out == expected_output
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+def test_region_detail_formatter_output_fmt_validation():
+    """Check that RegionDetailFormatter() raises ValueError.
+
+    Exception should be raised when invalid output_format is given.
+    """
+    expected = "Output format 'pytest_format' is not supported"
+    with pytest.raises(ValueError) as excinfo:
+        _ = formatters.RegionDetailFormatter(
+            output_format="pytest_format",
+            fhandle=sys.stdout,
+            sorting_fn=lambda region_detail: region_detail.region,
+        )
+
+    assert expected == str(excinfo.value)

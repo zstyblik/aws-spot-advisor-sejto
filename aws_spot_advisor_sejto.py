@@ -20,16 +20,12 @@ from lib import filters
 from lib import formatters
 from lib.dataset import DataSet
 from lib.models import EC2InstanceType
+from lib.models import RegionDetail
 
 CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
 DATA_DIR = os.path.dirname(os.path.realpath(__file__))
 DATASET_FNAME = "spot-advisor-data.json"
 DATASET_URL = "https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json"
-FORMATTERS = {
-    "csv": formatters.fmt_csv,
-    "json": formatters.fmt_json,
-    "text": formatters.fmt_text,
-}
 
 
 class DataProcessingException(Exception):
@@ -95,18 +91,31 @@ def get_sorting_function(sort_order: Dict[str, int]):
     return sorter
 
 
+def list_regions(dataset: DataSet, output_format: str) -> None:
+    """Print AWS regions and available OS-es in these regions."""
+    results = {
+        region: RegionDetail(
+            region=region,
+            operating_systems=sorted(
+                list(dataset.data["spot_advisor"][region].keys())
+            ),
+        )
+        for region in dataset.data["spot_advisor"]
+    }
+    formatter = formatters.RegionDetailFormatter(
+        output_format,
+        sys.stdout,
+        sorting_fn=lambda region_detail: region_detail.region,
+    )
+    formatter.fmt(results)
+
+
 def main():
     """Get data, filter data and print results."""
     args = parse_args()
     logging.basicConfig(level=args.log_level, stream=sys.stderr)
     logger = logging.getLogger("aws_spot_advisor_sejto")
-    if args.output_format not in FORMATTERS:
-        logging.error(
-            "Output format '%s' is not supported.", args.output_format
-        )
-        sys.exit(1)
 
-    print_out_fn = FORMATTERS[args.output_format]
     config_fpath = os.path.join(args.data_dir, CONFIG_FNAME)
     logger.debug("Config file '%s'.", config_fpath)
 
@@ -123,26 +132,37 @@ def main():
         )
         sys.exit(1)
 
-    if not dataset.has_region(args.region):
-        logger.error("Region '%s' not found in data.", args.region)
-        sys.exit(1)
+    if args.list_regions:
+        list_regions(dataset, args.output_format)
+    elif args.region:
+        if not dataset.has_region(args.region):
+            logger.error("Region '%s' not found in data.", args.region)
+            sys.exit(1)
 
-    if not dataset.has_os(args.region, args.os):
-        logger.error(
-            "OS '%s' is not available in region '%s'.",
-            args.os,
-            args.region,
+        if not dataset.has_os(args.region, args.os):
+            logger.error(
+                "OS '%s' is not available in region '%s'.",
+                args.os,
+                args.region,
+            )
+            sys.exit(1)
+
+        try:
+            results = select_data(dataset.data, args)
+        except DataProcessingException as exception:
+            logger.error("%s", exception.message)
+            sys.exit(1)
+
+        sorter = get_sorting_function(args.parsed_sort_order)
+        formatter = formatters.EC2InstanceTypeFormatter(
+            output_format=args.output_format,
+            fhandle=sys.stdout,
+            sorting_fn=sorter,
         )
+        formatter.fmt(results)
+    else:
+        logger.error("No action given and I don't know what to do.")
         sys.exit(1)
-
-    try:
-        results = select_data(dataset.data, args)
-    except DataProcessingException as exception:
-        logger.error("%s", exception.message)
-        sys.exit(1)
-
-    sorter = get_sorting_function(args.parsed_sort_order)
-    print_out_fn(results, sys.stdout, sorter)
 
 
 def parse_args() -> argparse.Namespace:
@@ -161,12 +181,20 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Increase log level verbosity. Can be passed multiple times.",
     )
-    parser.add_argument(
+
+    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument(
+        "--list-regions",
+        action="store_true",
+        default=False,
+        help="List AWS regions and available Operating Systems.",
+    )
+    action_group.add_argument(
         "--region",
         type=str,
-        required=True,
         help="AWS Region.",
     )
+
     parser.add_argument(
         "--os",
         type=str,

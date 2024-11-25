@@ -157,6 +157,7 @@ class DataSet:
 
             self.data_checksum = self.calc_checksum()
         else:
+            module_logger.debug("HTTP rsp body: '%s'", rsp.text)
             raise ValueError(
                 "Unexpected HTTP Status Code '{:s}'".format(rsp.status_code)
             )
@@ -181,5 +182,4 @@ def get_data(
     rsp = requests.get(url, timeout=timeout, headers=headers)
     module_logger.debug("HTTP rsp Status Code: %i", rsp.status_code)
     module_logger.debug("HTTP rsp Headers: %s", rsp.headers)
-    rsp.raise_for_status()
     return rsp
