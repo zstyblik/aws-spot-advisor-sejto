@@ -441,7 +441,7 @@ def test_parse_args_sort_oder_exc(capsys):
     ]
     with patch.object(sys, "argv", args):
         try:
-            sejto.parse_args()
+            sejto.parse_args("/path/doesnt/exist", "https://example.com")
         except SystemExit as sys_exit:
             exception = sys_exit
 

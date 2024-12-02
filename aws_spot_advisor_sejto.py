@@ -112,7 +112,7 @@ def list_regions(dataset: DataSet, output_format: str) -> None:
 
 def main():
     """Get data, filter data and print results."""
-    args = parse_args()
+    args = parse_args(DATA_DIR, DATASET_URL)
     logging.basicConfig(level=args.log_level, stream=sys.stderr)
     logger = logging.getLogger("aws_spot_advisor_sejto")
 
@@ -165,7 +165,7 @@ def main():
         sys.exit(1)
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(data_dir: str, dataset_url: str) -> argparse.Namespace:
     """Return parsed CLI args."""
     parser = argparse.ArgumentParser(
         allow_abbrev=False,
@@ -305,7 +305,7 @@ def parse_args() -> argparse.Namespace:
     others_group.add_argument(
         "--data-dir",
         type=str,
-        default=DATA_DIR,
+        default=data_dir,
         help=(
             "Directory where AWS Spot Advisor and config file are/will be "
             "stored."
@@ -314,7 +314,7 @@ def parse_args() -> argparse.Namespace:
     others_group.add_argument(
         "--dataset-url",
         type=str,
-        default=DATASET_URL,
+        default=dataset_url,
         help="URL of AWS Spot dataset.",
     )
 
