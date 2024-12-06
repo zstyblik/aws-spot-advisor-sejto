@@ -12,6 +12,7 @@ import os
 import sys
 from typing import Any
 from typing import Dict
+from typing import IO
 
 from requests.exceptions import BaseHTTPError
 
@@ -85,6 +86,20 @@ def get_sorting_function(sort_order: Dict[str, int]):
     return sorter
 
 
+def list_ec2_instance_options(fhandle: IO):
+    """List supported EC2 instance options."""
+    ec2_options = EC2InstanceType.list_options()
+    for option in ec2_options.values():
+        print("{:s}: {:s}".format(option.label, option.desc), file=fhandle)
+
+
+def list_ec2_instance_series(fhandle: IO):
+    """List supported EC2 instance series."""
+    ec2_series = EC2InstanceType.list_series()
+    for series in ec2_series.values():
+        print("{:s}: {:s}".format(series.label, series.desc), file=fhandle)
+
+
 def list_regions(dataset: DataSet, output_format: str) -> None:
     """Print AWS regions and available OS-es in these regions."""
     results = {
@@ -109,6 +124,14 @@ def main():
     args = cli_args.parse_args(DATA_DIR, DATASET_URL)
     logging.basicConfig(level=args.log_level, stream=sys.stderr)
     logger = logging.getLogger("aws_spot_advisor_sejto")
+
+    if args.list_instance_options:
+        list_ec2_instance_options(sys.stdout)
+        sys.exit(0)
+
+    if args.list_instance_series:
+        list_ec2_instance_series(sys.stdout)
+        sys.exit(0)
 
     config_fpath = os.path.join(args.data_dir, CONFIG_FNAME)
     logger.debug("Config file '%s'.", config_fpath)
@@ -205,6 +228,15 @@ def select_data(
                 float(values["ram_gb"]), args.mem_min, args.mem_max
             )
             and filters.filter_emr(values["emr"], args.emr_only)
+            and filters.filter_instance_type(
+                key,
+                args.re_exclude_instance_series,
+                args.re_include_instance_series,
+                args.re_exclude_instance_generations,
+                args.re_include_instance_generations,
+                args.re_exclude_instance_options,
+                args.re_include_instance_options,
+            )
         )
     }
     # NOTE(zstyblik): enhance results with savings and interrupts data

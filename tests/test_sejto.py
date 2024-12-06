@@ -311,6 +311,100 @@ def test_main_has_os_check(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_list_instance_options(mock_get_dataset, capsys, caplog):
+    """Test that --list-instance-options works as expected."""
+    expected_log_tuples = []
+    expected_output = [
+        "a: AMD processors",
+        "b: Block storage optimization",
+        "d: Instance store volumes",
+        "e: Extra storage or memory",
+        "flex: Flex instance",
+        "g: AWS Graviton processors",
+        "i: Intel processors",
+        "n: Network and EBS optimized",
+        "q: Qualcomm inference accelerators",
+        "z: High performance",
+        "",
+    ]
+
+    mock_get_dataset.side_effect = RuntimeError("should not be called")
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--list-instance-options",
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 0
+
+    assert mock_get_dataset.called is False
+
+    captured = capsys.readouterr()
+    assert captured.out == os.linesep.join(expected_output)
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_list_instance_series(mock_get_dataset, capsys, caplog):
+    """Test that --list-instance-series works as expected."""
+    expected_log_tuples = []
+    expected_output = [
+        "C: Compute optimized",
+        "D: Dense storage",
+        "F: FPGA",
+        "G: Graphics intensive",
+        "Hpc: High performance computing",
+        "Im: Storage optimized (1 to 4 ratio of vCPU to memory)",
+        "Inf: AWS Inferentia",
+        "Is: Storage optimized (1 to 6 ratio of vCPU to memory)",
+        "I: Storage optimized",
+        "Mac: macOS",
+        "M: General purpose",
+        "P: GPU accelerated",
+        "R: Memory optimized",
+        "T: Burstable performance",
+        "Trn: AWS Trainium",
+        "U: High memory",
+        "VT: Video transcoding",
+        "X: Memory intensive",
+        "",
+    ]
+
+    mock_get_dataset.side_effect = RuntimeError("should not be called")
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--list-instance-series",
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 0
+
+    assert mock_get_dataset.called is False
+
+    captured = capsys.readouterr()
+    assert captured.out == os.linesep.join(expected_output)
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
 @pytest.mark.parametrize(
     "output_format,expected_output",
     [

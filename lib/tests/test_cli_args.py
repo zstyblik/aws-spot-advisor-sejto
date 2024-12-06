@@ -30,6 +30,140 @@ def test_calc_log_level(count, expected_log_level):
     assert result == expected_log_level
 
 
+@pytest.mark.parametrize(
+    "input_data,expected_pattern",
+    [
+        (["1"], r"1"),
+        (["1", "2"], r"1|2"),
+        (["1,3", "2"], r"1|2|3"),
+    ],
+)
+def test_parse_instance_generations(input_data, expected_pattern):
+    """Test that parse_instance_generations() works as expected."""
+    result = cli_args.parse_instance_generations(input_data)
+    assert result.pattern == expected_pattern
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        (None, None),
+        ("", None),
+    ],
+)
+def test_parse_instance_generations_empty(input_data, expected):
+    """Test that parse_instance_generations() handles empty input."""
+    result = cli_args.parse_instance_generations(input_data)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        (["foo", "bar"], "bar,foo"),
+        (["1,bar"], "bar"),
+        (["1,2", "-1"], "-1"),
+    ],
+)
+def test_parse_instance_generations_exc(input_data, expected):
+    """Test parse_instance_generations() raises ValueError on invalid input."""
+    with pytest.raises(ValueError) as excinfo:
+        cli_args.parse_instance_generations(input_data)
+
+    expected_msg = "Unsupported EC2 instance generations '{:s}'".format(
+        expected
+    )
+    assert expected_msg == str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "input_data,expected_pattern",
+    [
+        (["a"], r"a"),
+        (["a", "b"], r"a|b"),
+        (["a,flex", "b"], r"-flex|a|b"),
+    ],
+)
+def test_parse_instance_options(input_data, expected_pattern):
+    """Test that parse_instance_options() works as expected."""
+    result = cli_args.parse_instance_options(input_data)
+    assert result.pattern == expected_pattern
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        (None, None),
+        ("", None),
+    ],
+)
+def test_parse_instance_options_empty(input_data, expected):
+    """Test that parse_instance_options() handles empty input."""
+    result = cli_args.parse_instance_options(input_data)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        (["a,foo", "b,bar"], "bar,foo"),
+        (["n,1,bar", "lar"], "1,bar,lar"),
+        (["1,2,e", "-1,d"], "-1,1,2"),
+    ],
+)
+def test_parse_instance_options_exc(input_data, expected):
+    """Test parse_instance_options() raises ValueError on invalid input."""
+    with pytest.raises(ValueError) as excinfo:
+        cli_args.parse_instance_options(input_data)
+
+    expected_msg = "Unsupported EC2 instance options '{:s}'".format(expected)
+    assert expected_msg == str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "input_data,expected_pattern",
+    [
+        (["c"], r"(?<!ma)c"),
+        (["g", "d"], r"d|g"),
+        (["inf,im", "d"], r"d|im|inf"),
+    ],
+)
+def test_parse_instance_series(input_data, expected_pattern):
+    """Test that parse_instance_series() works as expected."""
+    result = cli_args.parse_instance_series(input_data)
+    assert result.pattern == expected_pattern
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        (None, None),
+        ("", None),
+    ],
+)
+def test_parse_instance_series_empty(input_data, expected):
+    """Test that parse_instance_series() handles empty input."""
+    result = cli_args.parse_instance_series(input_data)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "input_data,expected",
+    [
+        (["hpc,a,foo", "mac"], "a,foo"),
+        (["is,1,bar", "lar"], "1,bar,lar"),
+        (["1,2,g", "-1,mac"], "-1,1,2"),
+    ],
+)
+def test_parse_instance_series_exc(input_data, expected):
+    """Test parse_instance_series() raises ValueError on invalid input."""
+    with pytest.raises(ValueError) as excinfo:
+        cli_args.parse_instance_series(input_data)
+
+    expected_msg = "Unsupported EC2 instance series '{:s}'".format(expected)
+    assert expected_msg == str(excinfo.value)
+
+
 def test_parse_args_sort_oder_exc(capsys):
     """Test that parse_args() handles ValueError exception as expected.
 
