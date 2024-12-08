@@ -3,9 +3,53 @@
 
 2024/Nov/06 @ Zdenek Styblik
 """
+import re
+from unittest.mock import patch
+
 import pytest
 
 from lib import filters
+
+
+@pytest.mark.parametrize(
+    "re_exclude,re_include,expected",
+    [
+        (
+            None,
+            None,
+            # falltrough
+            True,
+        ),
+        (
+            None,
+            # defined and re_include match
+            re.compile(r"^abc$"),
+            True,
+        ),
+        (
+            None,
+            # defined and re_include no match
+            re.compile(r"^$"),
+            False,
+        ),
+        (
+            # defined and re_exclude no match
+            re.compile(r"^$"),
+            None,
+            True,
+        ),
+        (
+            # defined and re_exclude match
+            re.compile(r"^abc$"),
+            None,
+            False,
+        ),
+    ],
+)
+def test_filter_by_regex(re_exclude, re_include, expected):
+    """Check whether filter_by_regex() works as expected."""
+    result = filters.filter_by_regex("abc", re_exclude, re_include)
+    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -21,6 +65,71 @@ def test_filter_emr(emr_supported, emr_only, expected):
     """Check whether filter_emr() works as expected."""
     result = filters.filter_emr(emr_supported, emr_only)
     assert result is expected
+
+
+def test_filter_instance_type():
+    """Smoke test of filter_instance_type()."""
+    result = filters.filter_instance_type(
+        "t2n.nano",
+        re.compile(r"^$"),
+        None,
+        re.compile(r"^$"),
+        None,
+        re.compile(r"^$"),
+        None,
+    )
+    assert result is True
+
+
+@pytest.mark.parametrize(
+    "keep_retvals,expected",
+    [
+        ([True, True, True], True),
+        ([False, True, True], False),
+        ([True, False, True], False),
+        ([True, True, False], False),
+    ],
+)
+@patch("lib.filters.filter_by_regex")
+def test_filter_instance_type_logic(
+    mock_by_regex,
+    keep_retvals,
+    expected,
+):
+    """Test eval logic in filter_instance_type()."""
+    mock_by_regex.side_effect = keep_retvals
+    result = filters.filter_instance_type(
+        "t2.nano",
+        re.compile(r""),
+        re.compile(r""),
+        re.compile(r""),
+        re.compile(r""),
+        re.compile(r""),
+        re.compile(r""),
+    )
+    assert mock_by_regex.called is True
+    assert result == expected
+
+
+@patch("lib.filters.parse_ec2_instance_type")
+def test_filter_instance_type_exc(mock_parse_ec2_it):
+    """Check that filter_instance_type() returns True on ValueError.
+
+    Check that filter_instance_type() returns True on ValueError from
+    parse_ec2_instance_type().
+    """
+    mock_parse_ec2_it.side_effect = ValueError("pytest")
+    result = filters.filter_instance_type(
+        "pytest",
+        re.compile(r""),
+        re.compile(r"^$"),
+        re.compile(r""),
+        re.compile(r"^$"),
+        re.compile(r""),
+        re.compile(r"^$"),
+    )
+    assert result is True
+    assert mock_parse_ec2_it.called is True
 
 
 @pytest.mark.parametrize(
@@ -118,3 +227,82 @@ def test_include_instance_type_exception(instance_type):
 
     expected = "Unexpected instance_type '{:s}'".format(instance_type)
     assert str(excinfo.value) == expected
+
+
+@pytest.mark.parametrize(
+    "instance_type,expected",
+    [
+        (
+            "mac1.metal",
+            ("mac", "1", "", "metal"),
+        ),
+        (
+            "mac2-m2.metal",
+            ("mac", "2", "-m2", "metal"),
+        ),
+        (
+            "mac2.metal",
+            ("mac", "2", "", "metal"),
+        ),
+        (
+            "mac2-m2pro.metal",
+            ("mac", "2", "-m2pro", "metal"),
+        ),
+        (
+            "mac2-m1ultra.metal",
+            ("mac", "2", "-m1ultra", "metal"),
+        ),
+        (
+            "i2.2xlarge",
+            ("i", "2", "", "2xlarge"),
+        ),
+        (
+            "u-6tb1.56xlarge",
+            ("u", "0", "6tb1", "56xlarge"),
+        ),
+        (
+            "c7i-flex.large",
+            ("c", "7", "i-flex", "large"),
+        ),
+        (
+            "inf1.24xlarge",
+            ("inf", "1", "", "24xlarge"),
+        ),
+        (
+            "u7in-32tb.224xlarge",
+            ("u", "7", "in-32tb", "224xlarge"),
+        ),
+        (
+            "t2.2xlarge",
+            ("t", "2", "", "2xlarge"),
+        ),
+        (
+            "i3en.xlarge",
+            ("i", "3", "en", "xlarge"),
+        ),
+        (
+            "r7iz.large",
+            ("r", "7", "iz", "large"),
+        ),
+    ],
+)
+def test_parse_ec2_instance_type(instance_type, expected):
+    """Check whether parse_ec2_instance_type() works as expected."""
+    result = filters.parse_ec2_instance_type(instance_type)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "instance_type,expected_message",
+    [
+        ("foo", "Unexpected instance_type 'foo'"),
+        ("foo.bar.lar", "Unexpected instance_type 'foo.bar.lar'"),
+        ("12345abc.metal", "Unable to parse instance_type '12345abc.metal'"),
+    ],
+)
+def test_parse_ec2_instance_type_exc(instance_type, expected_message):
+    """Test parse_ec2_instance_type() when invalid input is given."""
+    with pytest.raises(ValueError) as excinfo:
+        filters.parse_ec2_instance_type(instance_type)
+
+    assert str(excinfo.value) == expected_message

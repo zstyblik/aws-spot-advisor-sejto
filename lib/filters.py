@@ -5,7 +5,33 @@
 """
 import re
 
+# NOTE(zstyblik): eg. 'c7i-flex'
+RE_EC2IT1 = re.compile(r"^(?P<series>[a-z]+)(?P<gen>[0-9]+)(?P<opts>.*)", re.I)
+# NOTE(zstyblik): eg. 'u-6tb1'
+RE_EC2IT2 = re.compile(r"^(?P<series>[a-z]+)\-(?P<opts>.+)", re.I)
 RE_METAL = re.compile(r"metal")
+
+
+def filter_by_regex(
+    input_data: str,
+    re_exclude: re.Pattern | None,
+    re_include: re.Pattern | None,
+) -> bool:
+    """Filter input data by regex.
+
+    Return True when data should be kept, False means data should be discarded.
+    If re_include matches, then function returns and re_exclude is skipped.
+    """
+    if re_include:
+        if re_include.search(input_data):
+            return True
+
+        return False
+
+    if re_exclude and re_exclude.search(input_data):
+        return False
+
+    return True
 
 
 def filter_emr(emr_supported: bool, emr_only: bool) -> bool:
@@ -15,6 +41,46 @@ def filter_emr(emr_supported: bool, emr_only: bool) -> bool:
         return True
 
     return emr_supported
+
+
+def filter_instance_type(
+    instance_type: str,
+    re_exclude_instance_series: re.Pattern | None,
+    re_include_instance_series: re.Pattern | None,
+    re_exclude_instance_generations: re.Pattern | None,
+    re_include_instance_generations: re.Pattern | None,
+    re_exclude_instance_options: re.Pattern | None,
+    re_include_instance_options: re.Pattern | None,
+) -> bool:
+    """Filter EC2 instance type by series, generation and options.
+
+    If either of series, generation or options should be excluded, then the
+    whole EC2 instance should be excluded, resp. function will return False.
+    """
+    try:
+        series, gen, options, _ = parse_ec2_instance_type(instance_type)
+    except ValueError:
+        return True
+
+    keep_series = filter_by_regex(
+        series,
+        re_exclude_instance_series,
+        re_include_instance_series,
+    )
+    keep_gen = filter_by_regex(
+        gen,
+        re_exclude_instance_generations,
+        re_include_instance_generations,
+    )
+    keep_options = filter_by_regex(
+        options,
+        re_exclude_instance_options,
+        re_include_instance_options,
+    )
+    if not keep_series or not keep_gen or not keep_options:
+        return False
+
+    return True
 
 
 def filter_inters(inters: int, inters_min: int, inters_max: int) -> bool:
@@ -77,3 +143,31 @@ def include_instance_type(
         return False
 
     return True
+
+
+def parse_ec2_instance_type(instance_type: str) -> tuple[str, str, str, str]:
+    """Disassemble EC2 Instance Type into series, generation and options.
+
+    :raises ValueError: on invalid data
+    """
+    splitted = instance_type.split(".")
+    if len(splitted) != 2:
+        raise ValueError(
+            "Unexpected instance_type '{:s}'".format(instance_type)
+        )
+
+    match = RE_EC2IT1.search(splitted[0])
+    if not match:
+        match = RE_EC2IT2.search(splitted[0])
+
+    if not match:
+        raise ValueError(
+            "Unable to parse instance_type '{:s}'".format(instance_type)
+        )
+
+    match_dict = match.groupdict()
+    series = match_dict.get("series", "")
+    gen = match_dict.get("gen", "0")
+    opts = match_dict.get("opts", "")
+    size = splitted[1]
+    return (series.lower(), gen, opts.lower(), size.lower())

@@ -17,25 +17,6 @@ import aws_spot_advisor_sejto as sejto
 from lib import dataset
 
 
-@pytest.mark.parametrize(
-    "count,expected_log_level",
-    [
-        (-10, 40),
-        (0, 40),
-        (1, 30),
-        (2, 20),
-        (3, 10),
-        (4, 10),
-        (5, 10),
-        (50, 10),
-    ],
-)
-def test_calc_log_level(count, expected_log_level):
-    """Test that calc_log_level() works as expected."""
-    result = sejto.calc_log_level(count)
-    assert result == expected_log_level
-
-
 @patch("aws_spot_advisor_sejto.conf.write")
 def test_get_dataset(mock_conf_write, fixture_mock_requests, fixture_temp_file):
     """Test that get_dataset() works as expected."""
@@ -330,6 +311,100 @@ def test_main_has_os_check(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_list_instance_options(mock_get_dataset, capsys, caplog):
+    """Test that --list-instance-options works as expected."""
+    expected_log_tuples = []
+    expected_output = [
+        "a: AMD processors",
+        "b: Block storage optimization",
+        "d: Instance store volumes",
+        "e: Extra storage or memory",
+        "flex: Flex instance",
+        "g: AWS Graviton processors",
+        "i: Intel processors",
+        "n: Network and EBS optimized",
+        "q: Qualcomm inference accelerators",
+        "z: High performance",
+        "",
+    ]
+
+    mock_get_dataset.side_effect = RuntimeError("should not be called")
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--list-instance-options",
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 0
+
+    assert mock_get_dataset.called is False
+
+    captured = capsys.readouterr()
+    assert captured.out == os.linesep.join(expected_output)
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
+@patch("aws_spot_advisor_sejto.get_dataset")
+def test_main_list_instance_series(mock_get_dataset, capsys, caplog):
+    """Test that --list-instance-series works as expected."""
+    expected_log_tuples = []
+    expected_output = [
+        "C: Compute optimized",
+        "D: Dense storage",
+        "F: FPGA",
+        "G: Graphics intensive",
+        "Hpc: High performance computing",
+        "Im: Storage optimized (1 to 4 ratio of vCPU to memory)",
+        "Inf: AWS Inferentia",
+        "Is: Storage optimized (1 to 6 ratio of vCPU to memory)",
+        "I: Storage optimized",
+        "Mac: macOS",
+        "M: General purpose",
+        "P: GPU accelerated",
+        "R: Memory optimized",
+        "T: Burstable performance",
+        "Trn: AWS Trainium",
+        "U: High memory",
+        "VT: Video transcoding",
+        "X: Memory intensive",
+        "",
+    ]
+
+    mock_get_dataset.side_effect = RuntimeError("should not be called")
+
+    exception = None
+    args = [
+        "./aws_spot_advisor_sejto.py",
+        "--list-instance-series",
+    ]
+    with patch.object(sys, "argv", args):
+        try:
+            sejto.main()
+        except SystemExit as sys_exit:
+            exception = sys_exit
+
+    assert isinstance(exception, SystemExit) is True
+    assert exception.code == 0
+
+    assert mock_get_dataset.called is False
+
+    captured = capsys.readouterr()
+    assert captured.out == os.linesep.join(expected_output)
+    assert captured.err == ""
+
+    assert caplog.record_tuples == expected_log_tuples
+
+
 @pytest.mark.parametrize(
     "output_format,expected_output",
     [
@@ -418,133 +493,3 @@ def test_main_list_regions(
     assert captured.err == ""
 
     assert caplog.record_tuples == expected_log_tuples
-
-
-def test_parse_args_sort_oder_exc(capsys):
-    """Test that parse_args() handles ValueError exception as expected.
-
-    parse_sort_order() raises ValueError exception which should be handled as an
-    error message and SystemExit RC=2.
-    """
-    region = "us-east-1"
-    os_name = "Linux"
-
-    exception = None
-    args = [
-        "./aws_spot_advisor_sejto.py",
-        "--region",
-        region,
-        "--os",
-        os_name,
-        "--sort-order",
-        "pytest:pytest",
-    ]
-    with patch.object(sys, "argv", args):
-        try:
-            sejto.parse_args()
-        except SystemExit as sys_exit:
-            exception = sys_exit
-
-    assert isinstance(exception, SystemExit) is True
-    assert exception.code == 2
-
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert "Column 'pytest' is invalid. Valid columns are" in captured.err
-
-
-@pytest.mark.parametrize(
-    "input_data,expected",
-    [
-        (
-            "interrupts:asc,savings:desc",
-            {
-                "inter_max": 1,
-                "savings": (-1),
-            },
-        ),
-        (
-            "interrupts:desc,savings:asc",
-            {
-                "inter_max": (-1),
-                "savings": 1,
-            },
-        ),
-        (
-            "instance_type:asc,vcpus:asc,mem_gb:asc,savings:asc,interrupts:asc",
-            {
-                "instance_type": 1,
-                "vcpus": 1,
-                "mem_gb": 1,
-                "savings": 1,
-                "inter_max": 1,
-            },
-        ),
-    ],
-)
-def test_parse_sort_order(input_data, expected):
-    """Test parse_sort_order() under ideal conditions."""
-    results = sejto.parse_sort_order(input_data)
-    print(results)
-    assert results == expected
-
-
-@pytest.mark.parametrize(
-    "input_data,expected",
-    [
-        ("", "Input format must be 'column:sort_order', not ''."),
-        (
-            ":",
-            (
-                "Column '' is invalid. Valid columns are "
-                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
-                "'interrupts'."
-            ),
-        ),
-        (
-            "::",
-            (
-                "Column '' is invalid. Valid columns are "
-                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
-                "'interrupts'."
-            ),
-        ),
-        ("pytest", "Input format must be 'column:sort_order', not 'pytest'."),
-        (
-            ":pytest",
-            (
-                "Column '' is invalid. Valid columns are "
-                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
-                "'interrupts'."
-            ),
-        ),
-        (
-            "pytest:",
-            (
-                "Column 'pytest' is invalid. Valid columns are "
-                "'instance_type', 'vcpus', 'mem_gb', 'emr', 'savings', "
-                "'interrupts'."
-            ),
-        ),
-        (
-            "vcpus:pytest:pytest",
-            (
-                "Sort order 'pytest:pytest' is invalid. "
-                "Valid values are 'asc', 'desc'."
-            ),
-        ),
-        (
-            "vcpus:pytest",
-            (
-                "Sort order 'pytest' is invalid. "
-                "Valid values are 'asc', 'desc'."
-            ),
-        ),
-    ],
-)
-def test_parse_sort_order_exceptions(input_data, expected):
-    """Test exceptions and input validation in parse_sort_order()."""
-    with pytest.raises(ValueError) as excinfo:
-        sejto.parse_sort_order(input_data)
-
-    assert expected == str(excinfo.value)

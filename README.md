@@ -83,9 +83,6 @@ instance_type=r7iz.large vcpus=2 mem_gb=16.0 savings=60% interrupts=5-10%
 
 ## Possible planned features
 
-* filter by generation
-* include/exclude Graviton instances, perhaps even Intel/AMD
-* even more filtering?
 * show cost/pricing
 * web UI
 
