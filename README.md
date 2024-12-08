@@ -31,6 +31,8 @@ on top of that Sejto enables you to:
 * filter by min/max interrupts
 * filter by min/max savings
 * filter out either bare metal or VM instances
+* filter by series, generation or options, eg. include/exclude Graviton, AMD,
+  Intel, Trainium, 7th generation etc.
 * output in text, CSV and JSON format
 
 ## Example usage
