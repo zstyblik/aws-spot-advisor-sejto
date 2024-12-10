@@ -16,13 +16,13 @@ from typing import IO
 
 from requests.exceptions import BaseHTTPError
 
-from lib import cli_args
-from lib import conf
-from lib import filters
-from lib import formatters
-from lib.dataset import DataSet
-from lib.models import EC2InstanceType
-from lib.models import RegionDetail
+from .lib import cli_args
+from .lib import conf
+from .lib import filters
+from .lib import formatters
+from .lib.dataset import DataSet
+from .lib.models import EC2InstanceType
+from .lib.models import RegionDetail
 
 CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
 DATA_DIR = os.path.dirname(os.path.realpath(__file__))
