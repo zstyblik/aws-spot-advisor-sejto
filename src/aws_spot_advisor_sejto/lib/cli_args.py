@@ -221,7 +221,7 @@ def parse_args(data_dir: str, dataset_url: str) -> argparse.Namespace:
         default=data_dir,
         help=(
             "Directory where AWS Spot Advisor and config file are/will be "
-            "stored."
+            "stored. Defaults is '%(default)s'."
         ),
     )
     others_group.add_argument(
