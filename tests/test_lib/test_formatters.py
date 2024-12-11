@@ -8,10 +8,10 @@ import sys
 
 import pytest
 
-from aws_spot_advisor_sejto import get_sorting_function
-from lib import formatters
-from lib.models import EC2InstanceType
-from lib.models import RegionDetail
+from aws_spot_advisor_sejto.lib import formatters
+from aws_spot_advisor_sejto.lib.models import EC2InstanceType
+from aws_spot_advisor_sejto.lib.models import RegionDetail
+from aws_spot_advisor_sejto.sejto import get_sorting_function
 
 
 @pytest.fixture

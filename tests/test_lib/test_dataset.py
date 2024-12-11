@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from lib import dataset
+from aws_spot_advisor_sejto.lib import dataset
 
 SCRIPT_PATH = os.path.dirname(os.path.realpath(__file__))
 

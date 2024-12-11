@@ -40,7 +40,7 @@ on top of that Sejto enables you to:
 Example usage for Linux instances:
 
 ```Bash
-$ ./aws_spot_advisor_sejto.py \
+$ aws_spot_advisor_sejto \
     --region us-east-1 \
     --os Linux \
     --savings-min 60 \
@@ -64,7 +64,7 @@ instance_type=c7gn.2xlarge vcpus=8 mem_gb=16.0 savings=81% interrupts=5-10%
 And example usage for Windows instances:
 
 ```Bash
-$ ./aws_spot_advisor_sejto.py \
+$ aws_spot_advisor_sejto \
     --region us-east-1 \
     --os Windows \
     --savings-min 60 \

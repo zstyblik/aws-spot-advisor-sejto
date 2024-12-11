@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools >=64", "setuptools_scm[toml] >=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aws_spot_advisor_sejto"
+authors = [
+    {name = "Zdenek Styblik"},
+]
+description = "Slightly improved version of AWS Spot Advisor"
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["aws"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+dynamic = ["dependencies", "version"]
+
+[project.scripts]
+aws_spot_advisor_sejto = "aws_spot_advisor_sejto.sejto:main"
+
+[project.urls]
+Repository = "https://github.com/zstyblik/aws-spot-advisor-sejto.git"
+Issues = "https://github.com/zstyblik/aws-spot-advisor-sejto/issues"
+
+[tool.black]
+line-length = 80
+target-version = ["py311"]
+include = '\.pyi?$'
+unstable = false
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools_scm]
+# Nothing so far.

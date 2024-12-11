@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from lib import models
+from aws_spot_advisor_sejto.lib import models
 
 
 @pytest.mark.parametrize(
