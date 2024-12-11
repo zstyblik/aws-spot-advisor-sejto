@@ -10,6 +10,7 @@ import argparse
 import logging
 import os
 import sys
+import tempfile
 from typing import Any
 from typing import Dict
 from typing import IO
@@ -25,7 +26,7 @@ from .lib.models import EC2InstanceType
 from .lib.models import RegionDetail
 
 CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
-DATA_DIR = os.path.dirname(os.path.realpath(__file__))
+DATA_DIR = tempfile.gettempdir()
 DATASET_FNAME = "spot-advisor-data.json"
 DATASET_URL = "https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json"
 
