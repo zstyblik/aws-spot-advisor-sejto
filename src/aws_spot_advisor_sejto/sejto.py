@@ -10,22 +10,24 @@ import argparse
 import logging
 import os
 import sys
+import tempfile
+import traceback
 from typing import Any
 from typing import Dict
 from typing import IO
 
 from requests.exceptions import BaseHTTPError
 
-from lib import cli_args
-from lib import conf
-from lib import filters
-from lib import formatters
-from lib.dataset import DataSet
-from lib.models import EC2InstanceType
-from lib.models import RegionDetail
+from .lib import cli_args
+from .lib import conf
+from .lib import filters
+from .lib import formatters
+from .lib.dataset import DataSet
+from .lib.models import EC2InstanceType
+from .lib.models import RegionDetail
 
 CONFIG_FNAME = "aws_spot_advisor_sejto.ini"
-DATA_DIR = os.path.dirname(os.path.realpath(__file__))
+DATA_DIR = os.path.join(tempfile.gettempdir(), "aws-spot-advisory-sejto")
 DATASET_FNAME = "spot-advisor-data.json"
 DATASET_URL = "https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json"
 
@@ -132,6 +134,18 @@ def main():
     if args.list_instance_series:
         list_ec2_instance_series(sys.stdout)
         sys.exit(0)
+
+    try:
+        os.mkdir(args.data_dir)
+    except FileExistsError:
+        logger.debug("Directory '%s' already exists.", args.data_dir)
+    except Exception:
+        logger.error(
+            "Unable to create director '%s' due to exception: %s",
+            args.data_dir,
+            traceback.format_exc(),
+        )
+        raise
 
     config_fpath = os.path.join(args.data_dir, CONFIG_FNAME)
     logger.debug("Config file '%s'.", config_fpath)

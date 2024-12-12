@@ -13,11 +13,11 @@ from unittest.mock import patch
 import pytest
 from requests.exceptions import BaseHTTPError
 
-import aws_spot_advisor_sejto as sejto
-from lib import dataset
+from aws_spot_advisor_sejto import sejto
+from aws_spot_advisor_sejto.lib import dataset
 
 
-@patch("aws_spot_advisor_sejto.conf.write")
+@patch("aws_spot_advisor_sejto.sejto.conf.write")
 def test_get_dataset(mock_conf_write, fixture_mock_requests, fixture_temp_file):
     """Test that get_dataset() works as expected."""
     test_url = "https://pytest.example.com/"
@@ -53,7 +53,7 @@ def test_get_dataset(mock_conf_write, fixture_mock_requests, fixture_temp_file):
     assert req_history[0].url == test_url
 
 
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main(mock_get_dataset, capsys, caplog):
     """Test run-through main().
 
@@ -126,7 +126,7 @@ def test_main(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main_get_dataset_http_exception(mock_get_dataset, capsys, caplog):
     """Test handling of requests' exception from get_dataset()."""
     region = "us-east-1"
@@ -172,7 +172,7 @@ def test_main_get_dataset_http_exception(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main_get_dataset_oserror_exception(mock_get_dataset, capsys, caplog):
     """Test handling of OSError exception from get_dataset()."""
     region = "us-east-1"
@@ -218,7 +218,7 @@ def test_main_get_dataset_oserror_exception(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main_has_region_check(mock_get_dataset, capsys, caplog):
     """Test that region check works as execpted in main()."""
     region = "us-east-1"
@@ -261,7 +261,7 @@ def test_main_has_region_check(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main_has_os_check(mock_get_dataset, capsys, caplog):
     """Test that OS check works as execpted in main()."""
     region = "us-east-1"
@@ -311,7 +311,7 @@ def test_main_has_os_check(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main_list_instance_options(mock_get_dataset, capsys, caplog):
     """Test that --list-instance-options works as expected."""
     expected_log_tuples = []
@@ -354,7 +354,7 @@ def test_main_list_instance_options(mock_get_dataset, capsys, caplog):
     assert caplog.record_tuples == expected_log_tuples
 
 
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main_list_instance_series(mock_get_dataset, capsys, caplog):
     """Test that --list-instance-series works as expected."""
     expected_log_tuples = []
@@ -450,7 +450,7 @@ def test_main_list_instance_series(mock_get_dataset, capsys, caplog):
         ),
     ],
 )
-@patch("aws_spot_advisor_sejto.get_dataset")
+@patch("aws_spot_advisor_sejto.sejto.get_dataset")
 def test_main_list_regions(
     mock_get_dataset, output_format, expected_output, capsys, caplog
 ):

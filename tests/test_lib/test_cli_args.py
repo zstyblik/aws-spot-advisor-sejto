@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lib import cli_args
+from aws_spot_advisor_sejto.lib import cli_args
 
 
 @pytest.mark.parametrize(

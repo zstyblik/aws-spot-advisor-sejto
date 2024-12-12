@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lib import filters
+from aws_spot_advisor_sejto.lib import filters
 
 
 @pytest.mark.parametrize(
@@ -90,7 +90,7 @@ def test_filter_instance_type():
         ([True, True, False], False),
     ],
 )
-@patch("lib.filters.filter_by_regex")
+@patch("aws_spot_advisor_sejto.lib.filters.filter_by_regex")
 def test_filter_instance_type_logic(
     mock_by_regex,
     keep_retvals,
@@ -111,7 +111,7 @@ def test_filter_instance_type_logic(
     assert result == expected
 
 
-@patch("lib.filters.parse_ec2_instance_type")
+@patch("aws_spot_advisor_sejto.lib.filters.parse_ec2_instance_type")
 def test_filter_instance_type_exc(mock_parse_ec2_it):
     """Check that filter_instance_type() returns True on ValueError.
 
