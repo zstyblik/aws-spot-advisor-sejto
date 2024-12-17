@@ -50,3 +50,24 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
           print-hash: true
+
+  publish-to-pypi:
+    name: Publish packages to PyPI
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - publish-to-test-pypi
+    environment: prod-pypi
+    permissions:
+      # this permission is mandatory for trusted publishing
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish packages to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
